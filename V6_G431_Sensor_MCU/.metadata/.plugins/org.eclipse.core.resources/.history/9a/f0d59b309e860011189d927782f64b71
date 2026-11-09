@@ -1,0 +1,559 @@
+#include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "main.h"
+#include "sensor_service_i2c.h"
+#include "term_print.h"
+#include "prototypes.h"
+#include "env_flash.h"
+#include "ws2812.h"
+
+#include "sensor_dxl_service.h"
+
+#define MAX_LONG_COMMANDS      (64)
+#define END_OF_LONG_COMMANDS   "ZZZ"
+#define END_OF_COMMAND_HELP    "YYY"
+#define COMMAND_HISTORY_MAX    (6)
+
+#define ARROW_NONE             (0U)
+#define ARROW_UP               (1U)
+#define ARROW_DOWN             (2U)
+
+typedef void (*CmdHandler)(TERM_PORT tpid);
+
+typedef struct {
+    const char *cmd;
+    CmdHandler func;
+    const char *help;
+} CommandList;
+
+static void cmd_help(TERM_PORT tpid);
+static void cmd_ver(TERM_PORT tpid);
+static void cmd_reset(TERM_PORT tpid);
+static void cmd_sensor(TERM_PORT tpid);
+static void cmd_i2c(TERM_PORT tpid);
+static void cmd_uart(TERM_PORT tpid);
+static void cmd_mon(TERM_PORT tpid);
+static void cmd_trace(TERM_PORT tpid);
+static void cmd_led(TERM_PORT tpid);
+static void cmd_echo(TERM_PORT tpid);
+static void cmd_parm(TERM_PORT tpid);
+
+static void cmd_arx(TERM_PORT tpid);
+
+static void cmd_null(TERM_PORT tpid);
+static void cmd_end(TERM_PORT tpid);
+
+
+
+static const CommandList LongCommandsSet[] = {
+    {"VER",    cmd_ver,    "firmware banner"},
+    {"?",      cmd_help,   "show help"},
+    {"HELP",   cmd_help,   "show help"},
+    {"RESET",  cmd_reset,  "software reset"},
+    {"SENSOR", cmd_sensor, "sensor + UART summary"},
+    {"I2C",    cmd_i2c,    "I2C status/test/scan"},
+    {"UART",   cmd_uart,   "UART1 stream counters"},
+    {"MON",    cmd_mon,    "monitor control"},
+    {"LED",    cmd_led,    "WS2812B LED control"},
+    {"PARM",   cmd_parm,   "flash param: SAVE/LOAD/DEFAULT/SHOW"},
+	{"ARX",    cmd_parm,   "dxl_rx_arm"},
+    {"T",      cmd_trace,  "trace off/on"},
+    {"TRACE",  cmd_trace,  "trace off/on"},
+    {END_OF_COMMAND_HELP, cmd_null, ""},
+    {"ECHO",   cmd_echo,   "echo off/on"},
+    {END_OF_LONG_COMMANDS, cmd_end, ""},
+};
+
+static char cmd_line_argv[MAX_CMD_ARGV][MAX_ARGV_LENGTH];
+static int cmd_line_argc;
+static char command_history[COMMAND_HISTORY_MAX][COMMAND_MAX_LENGTH];
+static uint8_t history_wr;
+static uint8_t history_rd;
+static uint8_t esc_step[TPID_MAX];
+
+static void parse_argv(const char *cmd)
+{
+    cmd_line_argc = 0;
+    memset(cmd_line_argv, 0, sizeof(cmd_line_argv));
+
+    const char *p = cmd;
+    while ((*p != '\0') && (cmd_line_argc < MAX_CMD_ARGV)) {
+        while (*p == ' ') { p++; }
+        if (*p == '\0') { break; }
+
+        int len = 0;
+        while ((*p != '\0') && (*p != ' ') && (len < (MAX_ARGV_LENGTH - 1))) {
+            cmd_line_argv[cmd_line_argc][len++] = *p++;
+        }
+        cmd_line_argv[cmd_line_argc][len] = '\0';
+        cmd_line_argc++;
+    }
+}
+
+static void erase_current_line(TERM_PORT tpid)
+{
+    int len = cmd_index[tpid];
+    for (int i = 0; i < len; i++) { term_printf(tpid, "\b"); }
+    for (int i = 0; i < len; i++) { term_printf(tpid, " "); }
+    for (int i = 0; i < len; i++) { term_printf(tpid, "\b"); }
+}
+
+static void save_history(const char *cmd)
+{
+    if ((cmd == NULL) || (cmd[0] == '\0')) {
+        return;
+    }
+
+    uint8_t prev = (history_wr == 0U) ? (COMMAND_HISTORY_MAX - 1U) : (uint8_t)(history_wr - 1U);
+    if (strcmp(command_history[prev], cmd) == 0) {
+        return;
+    }
+
+    strncpy(command_history[history_wr], cmd, COMMAND_MAX_LENGTH - 1);
+    command_history[history_wr][COMMAND_MAX_LENGTH - 1] = '\0';
+    history_wr = (uint8_t)((history_wr + 1U) % COMMAND_HISTORY_MAX);
+}
+
+static const char *history_get(uint8_t direction)
+{
+    if (direction == ARROW_UP) {
+        uint8_t next = (history_rd == 0U) ? (COMMAND_HISTORY_MAX - 1U) : (uint8_t)(history_rd - 1U);
+        if (command_history[next][0] != '\0') {
+            history_rd = next;
+            return command_history[history_rd];
+        }
+    } else if (direction == ARROW_DOWN) {
+        if (history_rd != history_wr) {
+            history_rd = (uint8_t)((history_rd + 1U) % COMMAND_HISTORY_MAX);
+            if (history_rd != history_wr) {
+                return command_history[history_rd];
+            }
+        }
+    }
+    return NULL;
+}
+
+static void recall_history(TERM_PORT tpid, uint8_t direction)
+{
+    const char *hist = history_get(direction);
+
+    erase_current_line(tpid);
+    command[tpid][0] = '\0';
+    cmd_index[tpid] = 0;
+
+    if ((hist != NULL) && (hist[0] != '\0')) {
+        strncpy(command[tpid], hist, COMMAND_MAX_LENGTH - 1);
+        command[tpid][COMMAND_MAX_LENGTH - 1] = '\0';
+        cmd_index[tpid] = (int)strlen(command[tpid]);
+        term_printf(tpid, "%s", command[tpid]);
+    }
+}
+
+static uint8_t arrow_key_process(TERM_PORT tpid, char ch)
+{
+    if (esc_step[tpid] == 1U) {
+        if (ch == '[') {
+            esc_step[tpid] = 2U;
+            return 1U;
+        }
+        esc_step[tpid] = 0U;
+        return 0U;
+    }
+
+    if (esc_step[tpid] == 2U) {
+        esc_step[tpid] = 0U;
+        if (ch == 'A') {
+            recall_history(tpid, ARROW_UP);
+        } else if (ch == 'B') {
+            recall_history(tpid, ARROW_DOWN);
+        }
+        return 1U;
+    }
+
+    return 0U;
+}
+
+static void cmd_help(TERM_PORT tpid)
+{
+    term_printf(tpid, "\r\n--- 02 V6S Sensor G431 Debug CLI ---\r\n"); /* */
+    for (int i = 0; i < MAX_LONG_COMMANDS; i++) {
+        if (strcmp(LongCommandsSet[i].cmd, END_OF_COMMAND_HELP) == 0) {
+            break;
+        }
+        term_printf(tpid, " %-7s : %s\r\n", LongCommandsSet[i].cmd, LongCommandsSet[i].help);
+    }
+    term_printf(tpid, "\r\n");
+    term_printf(tpid, " I2C TEST <0..2>       : blocking pressure/temp read\r\n");
+    term_printf(tpid, " I2C SCAN <0..2>       : scan one I2C bus\r\n");
+    term_printf(tpid, " I2C FAKE <0..2> ON|OFF: inject synthetic sensor data\r\n");
+    term_printf(tpid, " MON ON/OFF       : monitor output\r\n");
+    term_printf(tpid, " MON INT <sec>    : monitor interval\r\n");
+    term_printf(tpid, " MON MODE <mask>  : 0x01 sys, 0x02 sensor, 0x04 UART\r\n");
+    term_printf(tpid, " LED <r> <g> <b>  : set WS2812B color\r\n");
+    term_printf(tpid, " ECHO <0|1>       : terminal echo off/on\r\n");
+    term_printf(tpid, " PARM SAVE        : save working params to flash (page 7, 0x08003800)\r\n");
+    term_printf(tpid, " PARM LOAD        : load params from flash\r\n");
+    term_printf(tpid, " PARM DEFAULT     : reset params to defaults (RAM only)\r\n");
+    term_printf(tpid, " PARM ERASE       : erase flash param page\r\n");
+    term_printf(tpid, " PARM SHOW        : show current working params\r\n\r\n");
+}
+
+static void cmd_ver(TERM_PORT tpid)
+{
+    (void)tpid;
+    print_reset_info();
+}
+
+static void cmd_reset(TERM_PORT tpid)
+{
+    term_printf(tpid, "reset...\r\n");
+    uart_tx_service();
+    NVIC_SystemReset();
+}
+
+static void print_i2c_status(TERM_PORT tpid)
+{
+    for (uint8_t ch = 0U; ch < SENSOR_CH_NUM; ch++) {
+        term_printf(tpid,
+                    "\r\n[I2C%u] present=%u data_err=%u st=%u p=%u raw=%ld temp=%d.%02dC sample=%lu start=%lu err=%lu i2cerr=0x%08lX\r\n",
+                    (unsigned int)(ch + 1U),
+                    (unsigned int)g_sensor[ch].present,
+                    (unsigned int)((g_sensor[ch].data_valid != 0U) ? 0U : 1U),
+                    (unsigned int)g_sensor[ch].state,
+                    (unsigned int)g_sensor[ch].value_hpa,
+                    (long)g_sensor[ch].pressure_raw,
+                    (int)(g_sensor[ch].temp_c_x100 / 100),
+                    (int)abs(g_sensor[ch].temp_c_x100 % 100),
+                    (unsigned long)g_sensor[ch].sample_cnt,
+                    (unsigned long)g_sensor[ch].start_cnt,
+                    (unsigned long)g_sensor[ch].err_cnt,
+                    (unsigned long)g_sensor[ch].last_i2c_err);
+    }
+}
+
+static void cmd_i2c_test(TERM_PORT tpid, uint8_t ch)
+{
+    uint8_t buf[5] = {0};
+    HAL_StatusTypeDef ret = sensor_service_i2c_test(ch, buf);
+    if (ret == HAL_OK) {
+        uint32_t praw = ((uint32_t)buf[2] << 16) | ((uint32_t)buf[1] << 8) | buf[0];
+        int16_t traw = (int16_t)(((uint16_t)buf[4] << 8) | buf[3]);
+        term_printf(tpid, "\r\n[I2C test ch%u] rawP=0x%06lX rawT=%d\r\n",
+                    (unsigned int)ch, (unsigned long)praw, (int)traw);
+    } else {
+        term_printf(tpid, "\r\n[I2C test ch%u] fail ret=%u err=0x%08lX\r\n",
+                    (unsigned int)ch, (unsigned int)ret,
+                    (unsigned long)g_sensor[ch].last_i2c_err);
+    }
+}
+
+static void cmd_i2c_scan(TERM_PORT tpid, uint8_t ch)
+{
+    uint8_t result[16] = {0};
+    uint8_t found = sensor_service_i2c_scan(ch, result);
+    term_printf(tpid, "\r\n[I2C scan ch%u] found=%u\r\n", (unsigned int)ch, (unsigned int)found);
+    for (uint8_t i = 0U; (i < found) && (i < 16U); i++) {
+        term_printf(tpid, "  0x%02X\r\n", (unsigned int)result[i]);
+    }
+}
+
+static void cmd_i2c(TERM_PORT tpid)
+{
+    if ((cmd_line_argc >= 3) && (strcmp(cmd_line_argv[1], "TEST") == 0)) {
+        uint8_t ch = (uint8_t)atoi(cmd_line_argv[2]);
+        if (ch < SENSOR_CH_NUM) {
+            cmd_i2c_test(tpid, ch);
+        } else {
+            term_printf(tpid, "channel must be 0..%u\r\n", (unsigned int)(SENSOR_CH_NUM - 1U));
+        }
+    } else if ((cmd_line_argc >= 3) && (strcmp(cmd_line_argv[1], "SCAN") == 0)) {
+        uint8_t ch = (uint8_t)atoi(cmd_line_argv[2]);
+        if (ch < SENSOR_CH_NUM) {
+            cmd_i2c_scan(tpid, ch);
+        } else {
+            term_printf(tpid, "channel must be 0..%u\r\n", (unsigned int)(SENSOR_CH_NUM - 1U));
+        }
+    } else if ((cmd_line_argc >= 4) && (strcmp(cmd_line_argv[1], "FAKE") == 0)) {
+        uint8_t ch = (uint8_t)atoi(cmd_line_argv[2]);
+        uint8_t on = (strcmp(cmd_line_argv[3], "ON") == 0) ? 1U : 0U;
+        if (ch < SENSOR_CH_NUM) {
+            g_sensor[ch].use_fake = on;
+            if (on) {
+                g_sensor[ch].present = 1U;
+                g_sensor[ch].state   = SS_IDLE;
+            }
+            term_printf(tpid, "I2C FAKE ch%u=%s\r\n", (unsigned int)ch, on ? "ON" : "OFF");
+        } else {
+            term_printf(tpid, "channel must be 0..%u\r\n", (unsigned int)(SENSOR_CH_NUM - 1U));
+        }
+    } else {
+        print_i2c_status(tpid);
+    }
+}
+
+static void cmd_uart(TERM_PORT tpid)
+{
+    term_printf(tpid, "\r\n[UART1] req=%lu rsp=%lu drop=%lu other=%lu oid=%lu noise=%lu busy=%u\r\n", /* diag split. */
+                (unsigned long)g_sen1_req_count,
+                (unsigned long)g_sen1_rsp_count,
+                (unsigned long)g_sen1_drop_count,
+                (unsigned long)g_sen1_other_count,
+                (unsigned long)g_sen1_other_id_count,
+                (unsigned long)g_sen1_noise_count,
+                (unsigned int)g_sensor_uart_busy);
+}
+
+static void cmd_can(TERM_PORT tpid)
+{
+    extern FDCAN_HandleTypeDef hfdcan1;
+    FDCAN_ProtocolStatusTypeDef ps = {0};
+    FDCAN_ErrorCountersTypeDef ec = {0};
+    (void)HAL_FDCAN_GetProtocolStatus(&hfdcan1, &ps);
+    (void)HAL_FDCAN_GetErrorCounters(&hfdcan1, &ec);
+
+    term_printf(tpid,
+                "\r\n[CAN] tx_ok=%lu fail=%lu irq=%lu busoff=%lu recover=%lu state=%u free=%lu\r\n",
+                (unsigned long)g_can_tx_ok,
+                (unsigned long)g_can_tx_fail,
+                (unsigned long)g_can_tx_err_irq,
+                (unsigned long)g_can_tx_busoff_cnt,
+                (unsigned long)g_can_tx_recover_cnt,
+                (unsigned int)HAL_FDCAN_GetState(&hfdcan1),
+                (unsigned long)HAL_FDCAN_GetTxFifoFreeLevel(&hfdcan1));
+    term_printf(tpid,
+                "      ps(le=%lu dle=%lu act=%lu ep=%lu warn=%lu bo=%lu brs=%lu fd=%lu) ec(tx=%lu rx=%lu log=%lu)\r\n",
+                (unsigned long)ps.LastErrorCode,
+                (unsigned long)ps.DataLastErrorCode,
+                (unsigned long)ps.Activity,
+                (unsigned long)ps.ErrorPassive,
+                (unsigned long)ps.Warning,
+                (unsigned long)ps.BusOff,
+                (unsigned long)ps.RxBRSflag,
+                (unsigned long)ps.RxFDFflag,
+                (unsigned long)ec.TxErrorCnt,
+                (unsigned long)ec.RxErrorCnt,
+                (unsigned long)ec.ErrorLogging);
+}
+
+static void cmd_sensor(TERM_PORT tpid)
+{
+    print_i2c_status(tpid);
+    cmd_uart(tpid);
+    cmd_can(tpid);
+}
+
+static void cmd_arx(TERM_PORT tpid)
+{
+
+	dbg_cmd_arx();
+}
+
+static void cmd_mon(TERM_PORT tpid)
+{
+    if (cmd_line_argc < 2) {
+        term_printf(tpid, "\r\nMON ON/OFF | MON INT <sec> | MON MODE <mask> | MON ST\r\n");
+        term_printf(tpid, "on=%lu int=%lu mode=0x%02lX\r\n",
+                    (unsigned long)g_mon_onoff,
+                    (unsigned long)env_working[PARM_MON_INTERVAL_SEC],
+                    (unsigned long)g_mon_flag);
+        return;
+    }
+
+    if (strcmp(cmd_line_argv[1], "ON") == 0) {
+        env_working[PARM_MON_ONOFF] = 1U;
+        g_mon_onoff = 1U;
+    } else if (strcmp(cmd_line_argv[1], "OFF") == 0) {
+        env_working[PARM_MON_ONOFF] = 0U;
+        g_mon_onoff = 0U;
+    } else if ((strcmp(cmd_line_argv[1], "INT") == 0) && (cmd_line_argc >= 3)) {
+        env_working[PARM_MON_INTERVAL_SEC] = (uint32_t)strtoul(cmd_line_argv[2], NULL, 0);
+        if (env_working[PARM_MON_INTERVAL_SEC] == 0U) { env_working[PARM_MON_INTERVAL_SEC] = 1U; }
+    } else if ((strcmp(cmd_line_argv[1], "MODE") == 0) && (cmd_line_argc >= 3)) {
+        env_working[PARM_MON_FLAG] = (uint32_t)strtoul(cmd_line_argv[2], NULL, 0);
+        g_mon_flag = env_working[PARM_MON_FLAG];
+    } else if (strcmp(cmd_line_argv[1], "ST") == 0) {
+        uint32_t save = env_working[PARM_MON_ONOFF];
+        env_working[PARM_MON_ONOFF] = 1U;
+        monitor_service(tpid);
+        env_working[PARM_MON_ONOFF] = save;
+    }
+
+    term_printf(tpid, "\r\nmonitor on=%lu int=%lu mode=0x%02lX\r\n",
+                (unsigned long)env_working[PARM_MON_ONOFF],
+                (unsigned long)env_working[PARM_MON_INTERVAL_SEC],
+                (unsigned long)env_working[PARM_MON_FLAG]);
+}
+
+static void cmd_trace(TERM_PORT tpid)
+{
+    if (cmd_line_argc >= 2) {
+        trace_onoff = (uint8_t)atoi(cmd_line_argv[1]);
+    }
+    term_printf(tpid, "trace=%u\r\n", (unsigned int)trace_onoff);
+}
+
+static void cmd_led(TERM_PORT tpid)
+{
+    if (cmd_line_argc >= 2) {
+        if (strcmp(cmd_line_argv[1], "TEST") == 0) {
+            if (cmd_line_argc >= 3) {
+                uint8_t on = (strcmp(cmd_line_argv[2], "ON") == 0) ? 1U : 0U;
+                ws2812_set_test(on);
+                term_printf(tpid, "led test=%s\r\n", on ? "ON" : "OFF");
+            } else {
+                term_printf(tpid, "LED TEST ON|OFF\r\n");
+            }
+            return;
+        }
+        if (cmd_line_argc >= 4) {
+            uint8_t r = (uint8_t)strtoul(cmd_line_argv[1], NULL, 0);
+            uint8_t g = (uint8_t)strtoul(cmd_line_argv[2], NULL, 0);
+            uint8_t b = (uint8_t)strtoul(cmd_line_argv[3], NULL, 0);
+            ws2812_set_test(0U);
+            ws2812_set_rgb(r, g, b);
+            term_printf(tpid, "led=%u,%u,%u\r\n", (unsigned int)r, (unsigned int)g, (unsigned int)b);
+            return;
+        }
+    }
+    term_printf(tpid, "LED <r> <g> <b>  |  LED TEST ON|OFF\r\n");
+}
+
+static void cmd_echo(TERM_PORT tpid)
+{
+    if (cmd_line_argc >= 2) {
+        echo_mode = (char)atoi(cmd_line_argv[1]);
+    }
+    term_printf(tpid, "echo=%u\r\n", (unsigned int)echo_mode);
+}
+
+static void cmd_parm(TERM_PORT tpid)
+{
+    if (cmd_line_argc < 2) {
+        term_printf(tpid, "PARM SAVE|LOAD|DEFAULT|SHOW\r\n");
+        return;
+    }
+
+    if (strcmp(cmd_line_argv[1], "SAVE") == 0) {
+        env_flash_copy_to_flash_buf();
+        HAL_StatusTypeDef st = env_flash_save();
+        term_printf(tpid, "PARM SAVE %s\r\n", (st == HAL_OK) ? "OK" : "FAIL");
+
+    } else if (strcmp(cmd_line_argv[1], "LOAD") == 0) {
+        env_flash_default();
+        env_flash_load();
+        env_flash_copy_to_working();
+        term_printf(tpid, "PARM LOAD OK\r\n");
+
+    } else if (strcmp(cmd_line_argv[1], "DEFAULT") == 0) {
+        env_flash_default();
+        env_flash_copy_to_working();
+        term_printf(tpid, "PARM DEFAULT (RAM only - use PARM SAVE to persist)\r\n");
+
+    } else if (strcmp(cmd_line_argv[1], "ERASE") == 0) {
+        HAL_StatusTypeDef st = env_flash_erase();
+        term_printf(tpid, "PARM ERASE %s\r\n", (st == HAL_OK) ? "OK" : "FAIL");
+
+    } else if (strcmp(cmd_line_argv[1], "SHOW") == 0) {
+        term_printf(tpid, "\r\n[PARM] working values:\r\n");
+        term_printf(tpid, "  [%u] TRACE_FLAG       = %lu\r\n",
+                    PARM_TRACE_FLAG, (unsigned long)env_working[PARM_TRACE_FLAG]);
+        term_printf(tpid, "  [%u] MON_ONOFF        = %lu\r\n",
+                    PARM_MON_ONOFF, (unsigned long)env_working[PARM_MON_ONOFF]);
+        term_printf(tpid, "  [%u] MON_INTERVAL_SEC = %lu\r\n",
+                    PARM_MON_INTERVAL_SEC, (unsigned long)env_working[PARM_MON_INTERVAL_SEC]);
+        term_printf(tpid, "  [%u] MON_FLAG         = 0x%02lX\r\n",
+                    PARM_MON_FLAG, (unsigned long)env_working[PARM_MON_FLAG]);
+        term_printf(tpid, "  [%u] MON_LINE         = %lu\r\n",
+                    PARM_MON_LINE, (unsigned long)env_working[PARM_MON_LINE]);
+        term_printf(tpid, "  [%u] I2C_POLL_MS      = %lu\r\n",
+                    PARM_I2C_POLL_MS, (unsigned long)env_working[PARM_I2C_POLL_MS]);
+        term_printf(tpid, "  [%u] UART_DEBUG_ECHO  = %lu\r\n",
+                    PARM_UART_DEBUG_ECHO, (unsigned long)env_working[PARM_UART_DEBUG_ECHO]);
+    } else {
+        term_printf(tpid, "PARM SAVE|LOAD|DEFAULT|ERASE|SHOW\r\n");
+    }
+}
+
+static void cmd_null(TERM_PORT tpid)
+{
+    (void)tpid;
+}
+
+static void cmd_end(TERM_PORT tpid)
+{
+    term_printf(tpid, "unknown command. type ?\r\n");
+}
+
+static void command_process(TERM_PORT tpid)
+{
+    command[tpid][cmd_index[tpid]] = '\0';
+    parse_argv(command[tpid]);
+
+    if (cmd_line_argc > 0) {
+        save_history(command[tpid]);
+        history_rd = history_wr;
+
+        for (int i = 0; i < MAX_LONG_COMMANDS; i++) {
+            if (strcmp(LongCommandsSet[i].cmd, END_OF_LONG_COMMANDS) == 0) {
+                LongCommandsSet[i].func(tpid);
+                break;
+            }
+            if (strcmp(cmd_line_argv[0], LongCommandsSet[i].cmd) == 0) {
+                LongCommandsSet[i].func(tpid);
+                break;
+            }
+        }
+    }
+
+    memset(command[tpid], 0, COMMAND_MAX_LENGTH);
+    cmd_index[tpid] = 0;
+}
+
+static void debug_command_process(TERM_PORT tpid, char ch)
+{
+    if ((ch == '\n') && (cmd_index[tpid] == 0)) {
+        return;
+    }
+
+    if (ch == 0x1B) {
+        esc_step[tpid] = 1U;
+        return;
+    }
+
+    if (esc_step[tpid] != 0U) {
+        (void)arrow_key_process(tpid, ch);
+        return;
+    }
+
+    if ((ch == '\r') || (ch == '\n')) {
+        term_printf(tpid, "\r\n");
+        command_process(tpid);
+    } else if (((ch == '\b') || (ch == 0x7F)) && (cmd_index[tpid] > 0)) {
+        cmd_index[tpid]--;
+        command[tpid][cmd_index[tpid]] = '\0';
+        if (echo_mode != 0) { term_printf(tpid, "\b \b"); }
+    } else if ((cmd_index[tpid] < (COMMAND_MAX_LENGTH - 1)) && (ch >= 0x20) && (ch < 0x7F)) {
+        char uc = (char)toupper((unsigned char)ch);
+        command[tpid][cmd_index[tpid]++] = uc;
+        command[tpid][cmd_index[tpid]] = '\0';
+        if (echo_mode != 0) { send_to_uart_tx_queue(tpid, uc); }
+    }
+}
+
+void debug_feature_service(TERM_PORT tpid)
+{
+    char ch;
+    while ((ch = receive_from_uart_rx_queue(tpid)) != (char)RX_BUFFER_EMPTY) {
+        debug_command_process(tpid, ch);
+    }
+}
+
+void init_debug_history(void)
+{
+    memset(command_history, 0, sizeof(command_history));
+    history_wr = 0U;
+    history_rd = 0U;
+    memset(esc_step, 0, sizeof(esc_step));
+}

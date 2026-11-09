@@ -1,0 +1,206 @@
+!SESSION 2026-07-10 09:45:20.414 -----------------------------------------------
+eclipse.buildId=Version 2.1.1
+java.version=21.0.9
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=ko_KR
+Command-line arguments:  -os win32 -ws win32 -arch x86_64
+
+!ENTRY org.eclipse.ui 2 0 2026-07-10 09:45:49.381
+!MESSAGE Warnings while parsing the images from the 'org.eclipse.ui.commandImages' extension point.
+!SUBENTRY 1 org.eclipse.ui 2 0 2026-07-10 09:45:49.381
+!MESSAGE Cannot bind to an undefined command: plug-in='com.genuitec.eclipse.theming.ui', id='com.genuitec.myeclipse.help.darktheme.commandid'
+
+!ENTRY com.genuitec.eclipse.theming.ui 1 0 2026-07-10 09:45:50.390
+!MESSAGE A DevStyle Theme is being activated on this workspace; preparing colors and configuration
+
+!ENTRY com.genuitec.eclipse.theming.ui 1 0 2026-07-10 09:45:50.432
+!MESSAGE DevStyle has archived current color configurations to alternate preferences - will be restored when switching out of the DevStyle Theme
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 1 1 2026-07-10 09:45:54.442
+!MESSAGE Log4j2 initialized with config file D:\workplace\STM32CubeIDE\APH_V6\V6_G431_Sensor\V6_IAP_G431_Sensor_MCU\.metadata\.log4j2.xml
+
+!ENTRY org.eclipse.egit.ui 2 0 2026-07-10 09:45:56.117
+!MESSAGE Warning: The environment variable HOME is not set. The following directory will be used to store the Git
+user global configuration and to define the default location to store repositories: 'C:\Users\msle9'. If this is
+not correct please set the HOME environment variable and restart Eclipse. Otherwise Git for Windows and
+EGit might behave differently since they see different configuration options.
+This warning can be switched off on the Team > Git > Confirmations and Warnings preference page.
+
+!ENTRY com.genuitec.eclipse.codetogether.ui 1 0 2026-07-10 09:45:58.091
+!MESSAGE No proxy data found for url: https://live.codetogether.io/ct-url
+
+!ENTRY com.st.stm32cube.ide.mcu.ide 1 1 2026-07-10 09:45:58.347
+!MESSAGE Started RMI Server, listening on port 41338
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 09:45:59.559
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 09:45:59.560
+!MESSAGE port: 
+
+!ENTRY org.eclipse.cdt.core 1 0 2026-07-10 09:49:18.060
+!MESSAGE Indexed '00_IAP_STM32G4_FWCube2.1.0' (25 sources, 122 headers) in 3.61 sec: 11,967 declarations; 52,752 references; 3 unresolved inclusions; 46 syntax errors; 171 unresolved names (0.26%)
+
+!ENTRY org.eclipse.cdt.core 1 0 2026-07-10 09:51:11.979
+!MESSAGE Indexed '00_IAP_STM32G4_FWCube2.1.0' (25 sources, 122 headers) in 2.1 sec: 11,967 declarations; 52,752 references; 3 unresolved inclusions; 46 syntax errors; 171 unresolved names (0.26%)
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 09:51:53.174
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM20
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 09:51:53.175
+!MESSAGE port: COM20
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 11:27:42.067
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM20
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 11:27:42.078
+!MESSAGE port: COM20
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 11:27:43.513
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM20
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 11:27:43.514
+!MESSAGE port: COM20
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 11:27:47.767
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 11:27:47.768
+!MESSAGE port: 
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 11:27:52.227
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM20
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 11:27:52.228
+!MESSAGE port: COM20
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 12:34:15.949
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 12:34:15.950
+!MESSAGE port: 
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 13:41:57.756
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM20
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 13:41:57.769
+!MESSAGE port: COM20
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:23:38.784
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:23:38.797
+!MESSAGE port: 
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:23:41.002
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM20
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:23:41.003
+!MESSAGE port: COM20
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:24:35.293
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:24:35.297
+!MESSAGE port: 
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:25:26.803
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM20
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:25:26.803
+!MESSAGE port: COM20
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:27:02.463
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM20
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:27:02.465
+!MESSAGE port: COM20
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:27:03.652
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM20
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:27:03.653
+!MESSAGE port: COM20
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:31:24.859
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:31:24.860
+!MESSAGE port: 
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:34:37.354
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM20
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:34:37.356
+!MESSAGE port: COM20
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:36:25.675
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:36:25.676
+!MESSAGE port: 
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:36:32.519
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM20
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:36:32.520
+!MESSAGE port: COM20
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:36:35.047
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:36:35.047
+!MESSAGE port: 
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:36:38.540
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM20
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:36:38.541
+!MESSAGE port: COM20
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:36:44.098
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:36:44.099
+!MESSAGE port: 
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:40:05.141
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM20
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-07-10 14:40:05.142
+!MESSAGE port: COM20
