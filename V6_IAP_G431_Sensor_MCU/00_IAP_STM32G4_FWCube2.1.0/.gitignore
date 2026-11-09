@@ -1,0 +1,27 @@
+﻿# --- (Build Outputs) ---
+# Release/
+
+Debug/
+bin/
+obj/
+*.elf
+*.list
+*.map
+*.hex
+*.bin
+*.srec
+*.bak
+
+# --- (IDE & Local Settings) ---
+.settings/
+.metadata/
+.analytics
+.log
+*.launch
+
+# --- (CubeMX Generated) ---
+# .mxproject 
+
+# --- (OS Temporary Files) ---
+.DS_Store
+Thumbs.db

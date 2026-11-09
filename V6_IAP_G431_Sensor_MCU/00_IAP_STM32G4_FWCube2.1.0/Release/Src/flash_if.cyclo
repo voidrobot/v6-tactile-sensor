@@ -1,0 +1,6 @@
+../Src/flash_if.c:11:13:flash_clear_flags	1
+../Src/flash_if.c:16:6:FLASH_If_Init	1
+../Src/flash_if.c:23:10:FLASH_If_Erase	4
+../Src/flash_if.c:62:10:FLASH_If_Write	8
+../Src/flash_if.c:102:10:FLASH_If_GetWriteProtectionStatus	1
+../Src/flash_if.c:107:10:FLASH_If_WriteProtectionConfig	1
